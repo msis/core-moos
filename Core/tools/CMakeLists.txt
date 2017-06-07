@@ -6,3 +6,8 @@ endforeach()
 
 
 add_subdirectory(umm)
+add_subdirectory(ktm)
+add_subdirectory(mtm)
+add_subdirectory(mqos)
+add_subdirectory(gtm)
+add_subdirectory(atm)

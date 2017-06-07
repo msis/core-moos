@@ -7,8 +7,7 @@ IF(WIN32)
 ENDIF(WIN32)
 
 #what files are needed?
-SET(SRCS MOOSDB.cpp MOOSDBMain.cpp MOOSDBVar.cpp MOOSRegisterInfo.cpp
-    MOOSDB.h MOOSDBVar.h MOOSRegisterInfo.h MOOSDBHTTPServer.cpp MOOSDBHTTPServer.h HTTPConnection.cpp HTTPConnection.h MsgFilter.cpp
+SET(SRCS  MOOSDBMain.cpp
     ${RESOURCES})
 
 include(PlatformDefines)
@@ -17,6 +16,7 @@ include(PlatformDefines)
 SET(DISABLE_NAMES_LOOKUP OFF CACHE BOOL "Disable client names lookup in MOOSDB")
 IF(DISABLE_NAMES_LOOKUP)
     ADD_DEFINITIONS(-DMOOS_DISABLE_NAMES_LOOKUP)
+    ADD_DEFINITIONS(-DMOOS_DISABLE_XPCTCP_NAME_LOOKUP)
 ENDIF(DISABLE_NAMES_LOOKUP)
 
 foreach(DEFINE ${PROJECT_EXPORT_DEFINES})        

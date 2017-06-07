@@ -4,6 +4,7 @@ SET(COMMS_SOURCES
     Comms/MOOSVariable.cpp
     Comms/MOOSCommClient.cpp
     Comms/MOOSAsyncCommClient.cpp
+	Comms/ClientCommsStatus.cpp
     Comms/MOOSCommObject.cpp
     Comms/MOOSCommPkt.cpp
     Comms/MOOSCommServer.cpp
@@ -17,6 +18,10 @@ SET(COMMS_SOURCES
     Comms/XPCUdpSocket.cpp
     Comms/ServerAudit.cpp
     Comms/ActiveMailQueue.cpp
+    Comms/MessageQueueAccumulator.cpp
+    Comms/SuicidalSleeper.cpp
+    Comms/MulticastNode.cpp
+    Comms/EndToEndAudit.cpp       
 )
 
 SET(APP_SOURCES
@@ -33,17 +38,17 @@ SET(UTILS_SOURCES
    Utils/ProcessConfigReader.cpp
    Utils/MOOSLinuxSerialPort.cpp
    Utils/MOOSSerialPort.cpp
-   Utils/MOOSPlaybackStatus.cpp
+#  Utils/MOOSPlaybackStatus.cpp
    Utils/IPV4Address.cpp
    Utils/KeyboardCapture.cpp
    Utils/ThreadPrint.cpp
    Utils/CommandLineParser.cpp
    Utils/ProcInfo.cpp
+   Utils/MemInfo.cpp
    Utils/ThreadPriority.cpp
    Utils/PeriodicEvent.cpp
    Utils/ConsoleColours.cpp
-   
-   
+   Utils/CommsTools.cpp   
    )
 
 IF(WIN32)
@@ -65,47 +70,52 @@ set(THIRDPARTY_SOURCES
   Thirdparty/PocoBits/src/Bugcheck.cpp
   Thirdparty/PocoBits/src/Debugger.cpp
   Thirdparty/AppCasting/AppCastingMOOSApp.cpp
+  Thirdparty/AppCasting/AppCastingMOOSInstrument.cpp
   Thirdparty/AppCasting/AppCast.cpp
 )
 
 
-set(SOURCES ${THIRDPARTY_SOURCES} ${UTILS_SOURCES} ${COMMS_SOURCES} ${APP_SOURCES} ) 
+SET(DB_SOURCES
+    DB/MOOSDB.cpp
+    DB/MOOSDBVar.cpp
+    DB/MOOSRegisterInfo.cpp
+    DB/MsgFilter.cpp
+    DB/HTTPConnection.cpp
+    DB/MOOSDBHTTPServer.cpp
+    DB/MOOSDBLogger.cpp
+)
+
+
+
+set(SOURCES ${THIRDPARTY_SOURCES} ${UTILS_SOURCES} ${COMMS_SOURCES} ${APP_SOURCES} ${DB_SOURCES}) 
 
 include(PlatformDefines)
 
 ##############   FAST COMMS?   ################
 #do we want to use the new fast asynchronous client architecture?
-OPTION(USE_ASYNC_COMMS  "enable fast asynchronous comms architecture" OFF)
+OPTION(USE_ASYNC_COMMS  "enable fast asynchronous comms architecture" ON)
 IF (USE_ASYNC_COMMS)
-    cache_internal_append_unique(PROJECT_EXPORT_DEFINES ASYNCHRONOUS_CLIENT)
-    ADD_DEFINITIONS(-DASYNCHRONOUS_CLIENT)
-ELSE (USE_ASYNC_COMMS)
-    message(STATUS "removing ASYNCHRONOUS_CLIENT")
-    cache_internal_remove(PROJECT_EXPORT_DEFINES ASYNCHRONOUS_CLIENT)
-    REMOVE_DEFINITIONS(-DASYNCHRONOUS_CLIENT)
+  set(ASYNCHRONOUS_CLIENT_DEFINE "#define ASYNCHRONOUS_CLIENT")
 ENDIF (USE_ASYNC_COMMS)
 
+#do we want to use the new fast asynchronous client architecture?
+OPTION(MOOS_DISABLE_XPCTCP_NAME_LOOKUP "Disable host name look ups" OFF)
+IF(MOOS_DISABLE_XPCTCP_NAME_LOOKUP)
+    ADD_DEFINITIONS(-DMOOS_DISABLE_XPCTCP_NAME_LOOKUP)
+ENDIF(MOOS_DISABLE_XPCTCP_NAME_LOOKUP)
 
 
-############# COMPRESSED COMMS? ################
-SET(COMPRESSED_MOOS_PROTOCOL FALSE CACHE BOOL "Compressed comms protocol (experimental)")
+#do we want to enable multicast performance reporting
+OPTION(ENABLE_DETAILED_TIMING_AUDIT "enable detailed timing audit (for use with atm)" OFF)
+IF(ENABLE_DETAILED_TIMING_AUDIT)
+    ADD_DEFINITIONS(-DENABLE_DETAILED_TIMING_AUDIT)
+ENDIF(ENABLE_DETAILED_TIMING_AUDIT)
 
-IF(COMPRESSED_MOOS_PROTOCOL)
-    FIND_PACKAGE(ZLIB QUIET)
-    IF (ZLIB_FOUND)
-        ADD_DEFINITIONS(-DZLIB_FOUND)
-            ADD_DEFINITIONS(-DCOMPRESSED_MOOS_PROTOCOL)
-    
-        MESSAGE(STATUS "Cmake FindZLIB: using ZLIB includes at: ${ZLIB_INCLUDE_DIR}")
-        MESSAGE(STATUS "Cmake FindZLIB: using ZLIB libraries: ${ZLIB_LIBRARIES}")
-
-        SET(PLATFORM_LIBS   ${PLATFORM_LIBS} ${ZLIB_LIBRARIES} )
-        INCLUDE_DIRECTORIES(${ZLIB_INCLUDE_DIR})    
-    
-    ELSE(ZLIB_FOUND)
-        SET(ZLIB_LIBRARIES "")
-    ENDIF (ZLIB_FOUND)
-ENDIF(COMPRESSED_MOOS_PROTOCOL)
+#do we want to enable multicast performance reporting
+OPTION(DEFAULT_NO_NAGLE "by default turn off nagle (makes for lower latency)" ON)
+IF(DEFAULT_NO_NAGLE)
+    ADD_DEFINITIONS(-DDEFAULT_NO_NAGLE)
+ENDIF(DEFAULT_NO_NAGLE)
 
 
 
@@ -116,12 +126,21 @@ IF (DETECT_CLOCK_DRIFT)
 ENDIF (DETECT_CLOCK_DRIFT)
 MARK_AS_ADVANCED(DETECT_CLOCK_DRIFT)
 
-# Removed the extra field that was added to the MOOS message protocol in October 2009.
+# Remove the extra field that was added to the MOOS message protocol in October 2009.
 OPTION(DISABLE_AUX_SOURCE "Disable the AUX_SRC field in MOOS messages.  Only change this if you know what it is!" OFF)
 IF (DISABLE_AUX_SOURCE)
   ADD_DEFINITIONS(-DDISABLE_AUX_SOURCE)
 ENDIF (DISABLE_AUX_SOURCE)
 MARK_AS_ADVANCED(DISABLE_AUX_SOURCE)
+
+
+set(TIME_WARP_AGGLOMERATION_CONSTANT  0.0 CACHE STRING "comms agglomeration scale factor for high time warps")
+IF (${TIME_WARP_AGGLOMERATION_CONSTANT} GREATER 0.0)
+  ADD_DEFINITIONS(-DTIME_WARP_AGGLOMERATION_CONSTANT=${TIME_WARP_AGGLOMERATION_CONSTANT})
+ENDIF ()
+MARK_AS_ADVANCED(TIME_WARP_AGGLOMERATION_CONSTANT)
+
+
 
 OPTION(ENABLE_V10_COMPATIBILITY  "Enable compatibility for source which includes pre V10 headers " OFF)
 OPTION(ENABLE_V10_IVP_COMPATIBILITY  "Enable compatibility for source which includes pre V10 headers as expected by IvP " OFF)
@@ -143,6 +162,8 @@ IF (ENABLE_V10_COMPATIBILITY)
     ENDIF()
 ENDIF ()
 
+CONFIGURE_FILE(${CMAKE_MODULE_PATH}/ClientDefines.h.in
+${CMAKE_CURRENT_SOURCE_DIR}/App/include/MOOS/libMOOS/App/ClientDefines.h @ONLY)
 
 
 ##########################
@@ -161,6 +182,7 @@ set(INCLUDE_ROOTS
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/App/include
     ${CMAKE_CURRENT_SOURCE_DIR}/Comms/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/DB/include
     ${CMAKE_CURRENT_SOURCE_DIR}/Utils/include
     ${CMAKE_CURRENT_SOURCE_DIR}/Thirdparty/PocoBits/include
     ${CMAKE_CURRENT_SOURCE_DIR}/Thirdparty/getpot/include
@@ -179,9 +201,9 @@ if(UNIX)
 endif(UNIX)
 
 IF(WIN32)
-  set(DEPENDENCIES wsock32 comctl32)
-  cache_internal_append_unique(PROJECT_EXPORT_DEFINES _WIN32_WINNT=0x501)
-  add_definitions(-D_WIN32_WINNT=0x501 )
+  set(DEPENDENCIES wsock32 comctl32 ws2_32) # adding ws2_32 to support IPv6
+  cache_internal_append_unique(PROJECT_EXPORT_DEFINES _WIN32_WINNT=0x600) # XP does not support IPv6. Moving to Vista and latter.
+  add_definitions(-D_WIN32_WINNT=0x600 )
 ENDIF(WIN32)
     
 
@@ -226,7 +248,7 @@ cache_internal_append_unique(PROJECT_EXPORT_LIBS
 # This is boilerplate.  Any extra libs you want to link should be in the '..._DEPEND_...'
 # variables
 include_directories(${${LIBNAME}_INCLUDE_DIRS} ${${LIBNAME}_DEPEND_INCLUDE_DIRS})
-add_library(${LIBNAME} STATIC ${SOURCES} ${PUBLIC_HEADERS})
+add_library(${LIBNAME} ${SOURCES} ${PUBLIC_HEADERS})
 target_link_libraries(${LIBNAME} ${${LIBNAME}_DEPEND_LIBRARIES})
 
 
@@ -234,7 +256,7 @@ target_link_libraries(${LIBNAME} ${${LIBNAME}_DEPEND_LIBRARIES})
 
 #######################################
 # install headers
-install(DIRECTORY ${INCLUDE_ROOTS} DESTINATION ${CMAKE_INSTALL_PREFIX} FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${INCLUDE_ROOTS} DESTINATION ${CMAKE_INSTALL_PREFIX} FILES_MATCHING PATTERN "*.h" PATTERN "*.hxx")
 
 
 # install libraries

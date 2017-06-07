@@ -31,43 +31,89 @@
 //////////////////////////    END_GPL    //////////////////////////////////
 #include "MOOS/libMOOS/Comms/XPCGetProtocol.h"
 
+CMOOSLock XPCGetProtocol::_ProtocolLock;
+
 XPCGetProtocol::XPCGetProtocol(const char *_sName)
 {
-#ifdef UNIX
-       cIteratorFlag = 0;
-#endif
-       // Retrieves the protocol structure by name
-       protocolPtr = getprotobyname(_sName);
-       if (protocolPtr == NULL)
-       {
-             XPCException exceptObject("Could Not Get Protocol By Name");
-             throw exceptObject;
-             return;
-        }
+    MOOS::ScopedLock L(_ProtocolLock);
+
+    struct protoent* ent = getprotobyname(_sName);
+    if (ent == NULL)
+    {
+        XPCException exceptObject("Could Not Get Protocol By Name");
+        throw exceptObject;
+        return;
+    }
+    _index = 0;
+    _protocols.push_back(XPCGetProtocol::ProtoEnt(ent));
 }
 
 XPCGetProtocol::XPCGetProtocol(int _iProtocol)
 {
+    MOOS::ScopedLock L(_ProtocolLock);
+
+    // Retrieves the protocol structure by number
+    struct protoent* ent = getprotobynumber(_iProtocol);
+    if (ent == NULL)
+    {
+        XPCException exceptObject("Could Not Get Protocol By Number");
+        throw exceptObject;
+        return;
+    }
+    _index = 0;
+    _protocols.push_back(XPCGetProtocol::ProtoEnt(ent));
+}
+
+XPCGetProtocol::~XPCGetProtocol()
+{
+    MOOS::ScopedLock L(_ProtocolLock);
+}
+
+
 #ifdef UNIX
-        cIteratorFlag = 0;
+void XPCGetProtocol::vOpenProtocolDb()
+{
+    MOOS::ScopedLock L(_ProtocolLock);
+
+    endprotoent();
+    setprotoent(1);
+    struct protoent* ent = 0;
+    _index = -1;   // call cGetNextProtocol before accessing the first one...
+    _protocols.clear();
+    while ((ent = getprotoent())) {
+        _protocols.push_back(XPCGetProtocol::ProtoEnt(ent));
+    }
+    endprotoent();
+}
+
+// Iterates through the list of protocols
+char XPCGetProtocol::cGetNextProtocol()
+{
+    MOOS::ScopedLock L(_ProtocolLock);
+
+    if (_index + 1 >= static_cast<int>(_protocols.size())) return 0;
+    ++_index;
+    return 1;
+}
 #endif
-#ifdef __linux
-        // Retrieves the protocol structure by number
-        char buf[1024];
 
-        getprotobynumber_r(_iProtocol,&protocol,
-                          buf, sizeof(buf), &protocolPtr);
+XPCGetProtocol::ProtoEnt::ProtoEnt(struct protoent const* ent):
+    _name(ent? ent->p_name: ""),
+    _number(ent? ent->p_proto: 0)
+{
+    if (ent == 0) return;
+    for (char** alias = ent->p_aliases; *alias; alias++) {
+        _aliases.push_back(std::string(*alias));
+    } 
+}
+XPCGetProtocol::ProtoEnt::~ProtoEnt()
+{
+}
 
+std::string const& XPCGetProtocol::ProtoEnt::name() const {
+    return _name;
+}
 
-        //protocolPtr = getprotobynumber_r(_iProtocol);//thread safe fix suggested by Mark Moseley
-#else
-        // Retrieves the protocol structure by number
-        protocolPtr = getprotobynumber(_iProtocol);
-#endif
-        if (protocolPtr == NULL)
-        {
-              XPCException exceptObject("Could Not Get Protocol By Number");
-              throw exceptObject;
-              return;
-        }
+int XPCGetProtocol::ProtoEnt::number() const {
+    return _number;
 }
