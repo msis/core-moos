@@ -209,7 +209,8 @@ bool ThreadedCommServer::AddAndStartClientThread(XPCTcpSocket & NewClientSocket,
 bool ThreadedCommServer::ServerLoop()
 {
 
-
+    double last_heart_beat = MOOS::Time();
+    const double kHeartBeatPrintPeriod = 1.0;
 
 	m_Auditor.SetQuiet(m_bQuiet);
     m_Auditor.Run("localhost",m_nAuditPort);
@@ -224,30 +225,34 @@ bool ThreadedCommServer::ServerLoop()
     {
         ClientThreadSharedData SDFromClient;
 
-       
-        if(m_SharedDataListFromClient.IsEmpty())
-        {
+
+        if(m_bPrintHeartBeat && MOOS::Time()-last_heart_beat>kHeartBeatPrintPeriod){
+            last_heart_beat = MOOS::Time();
+            std::cerr<<"DB::ServerLoop (threaded) ticks at "<< (int)last_heart_beat<<"\n";
+        }
+
+
+        if(m_SharedDataListFromClient.IsEmpty()){
             if(!m_SharedDataListFromClient.WaitForPush(1000))
                 continue;
         }
 
         m_SharedDataListFromClient.Pull(SDFromClient);
 
-        switch(SDFromClient._Status)
-        {
-        case ClientThreadSharedData::PKT_READ:
-        {
-            ProcessClient(SDFromClient,m_Auditor);
-            break;
-        }
+        switch(SDFromClient._Status){
+            case ClientThreadSharedData::PKT_READ:
+            {
+                ProcessClient(SDFromClient,m_Auditor);
+                break;
+            }
 
-        case ClientThreadSharedData::CONNECTION_CLOSED:
-            OnClientDisconnect(SDFromClient);
-            m_Auditor.Remove(SDFromClient._sClientName);
-            break;
+            case ClientThreadSharedData::CONNECTION_CLOSED:
+                OnClientDisconnect(SDFromClient);
+                m_Auditor.Remove(SDFromClient._sClientName);
+                break;
 
-        default:
-            break;
+            default:
+                break;
         }
 
     }
@@ -628,7 +633,7 @@ bool ThreadedCommServer::ClientThread::Run()
 
         case 0:
             //timeout...nothing to read - spin
-        	if(MOOSLocalTime()-dfLastGoodComms>_dfClientTimeout)
+        	if(MOOSLocalTime(false)-dfLastGoodComms>_dfClientTimeout)
         	{
         		std::cout<<MOOS::ConsoleColours::Red();
         		std::cout<<"Disconnecting \""<<_sClientName<<"\" after "<<_dfClientTimeout<<" seconds of silence\n";
@@ -651,7 +656,7 @@ bool ThreadedCommServer::ClientThread::Run()
                 }
 
                 //something good happened so record our success
-        		dfLastGoodComms = MOOSLocalTime();
+                dfLastGoodComms = MOOSLocalTime(false);
             }
             else
             {

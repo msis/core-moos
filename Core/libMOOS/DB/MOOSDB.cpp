@@ -217,6 +217,7 @@ void PrintHelpAndExit()
     std::cout<<"--moos_suicide_phrase=<str>        suicide pass phrase  \n";
     std::cout<<"--moos_suicide_disable             disable suicide monitoring \n";
     std::cout<<"--moos_suicide_print               print suicide conditions \n";
+    std::cout<<"--moos_no_colour                   dont use colour in printing \n";
 
 
 
@@ -233,6 +234,7 @@ void PrintHelpAndExit()
 	std::cout<<"--tcpnodelay                       disable nagle algorithm \n";
 	std::cout<<"--audit_port=<unsigned int>        specify port on which to transmit statistics\n";
     std::cout<<"--event_log=<file name>            specify file in which to record events\n";
+    std::cout<<"--print_heart_beat                 indicate DB heartbeat every second\n";
 
 
 
@@ -261,6 +263,11 @@ bool CMOOSDB::Run(int argc,  char * argv[] )
 {
 
 	MOOS::CommandLineParser P(argc,argv);
+
+    //disable colour printing maybe
+    if(P.GetFlag("--moos_no_colour")){
+        MOOS::ConsoleColours::Enable(false);
+    }
 
 
 	//mission file could be first free parameter
@@ -341,7 +348,6 @@ bool CMOOSDB::Run(int argc,  char * argv[] )
 
     if(P.GetFlag("--moos_print_version"))
         OnPrintVersionAndExit();
-
 
 
 	bool bTCPNoDelay = false;

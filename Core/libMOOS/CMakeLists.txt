@@ -21,8 +21,7 @@ SET(COMMS_SOURCES
     Comms/MessageQueueAccumulator.cpp
     Comms/SuicidalSleeper.cpp
     Comms/MulticastNode.cpp
-    
-    
+    Comms/EndToEndAudit.cpp       
 )
 
 SET(APP_SOURCES
@@ -104,6 +103,21 @@ OPTION(MOOS_DISABLE_XPCTCP_NAME_LOOKUP "Disable host name look ups" OFF)
 IF(MOOS_DISABLE_XPCTCP_NAME_LOOKUP)
     ADD_DEFINITIONS(-DMOOS_DISABLE_XPCTCP_NAME_LOOKUP)
 ENDIF(MOOS_DISABLE_XPCTCP_NAME_LOOKUP)
+
+
+#do we want to enable multicast performance reporting
+OPTION(ENABLE_DETAILED_TIMING_AUDIT "enable detailed timing audit (for use with atm)" OFF)
+IF(ENABLE_DETAILED_TIMING_AUDIT)
+    ADD_DEFINITIONS(-DENABLE_DETAILED_TIMING_AUDIT)
+ENDIF(ENABLE_DETAILED_TIMING_AUDIT)
+
+#do we want to enable multicast performance reporting
+OPTION(DEFAULT_NO_NAGLE "by default turn off nagle (makes for lower latency)" ON)
+IF(DEFAULT_NO_NAGLE)
+    ADD_DEFINITIONS(-DDEFAULT_NO_NAGLE)
+ENDIF(DEFAULT_NO_NAGLE)
+
+
 
 #do we want to turn on the experimental clock skew detection?
 OPTION(DETECT_CLOCK_DRIFT  "MOOSCommClient<->MOOSDB Clock drift detection (experimental)" OFF)
@@ -234,7 +248,7 @@ cache_internal_append_unique(PROJECT_EXPORT_LIBS
 # This is boilerplate.  Any extra libs you want to link should be in the '..._DEPEND_...'
 # variables
 include_directories(${${LIBNAME}_INCLUDE_DIRS} ${${LIBNAME}_DEPEND_INCLUDE_DIRS})
-add_library(${LIBNAME} STATIC ${SOURCES} ${PUBLIC_HEADERS})
+add_library(${LIBNAME} ${SOURCES} ${PUBLIC_HEADERS})
 target_link_libraries(${LIBNAME} ${${LIBNAME}_DEPEND_LIBRARIES})
 
 

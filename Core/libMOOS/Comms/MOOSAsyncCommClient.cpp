@@ -105,12 +105,14 @@ bool MOOSAsyncCommClient::StartThreads() {
     if (!ReadingThread_.Start())
         return false;
 
+
     return true;
 }
 
 bool MOOSAsyncCommClient::Close(bool) {
 
-    //std::cerr<<"MOOSAsyncCommClient::Close...\n";
+
+
 
     BASE::Close();
 
